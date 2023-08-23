@@ -1,3 +1,4 @@
+const { pushToQueue, createQueue } = require("../config/rabitmq");
 const { ProductModel } = require("../model/product.model");
 
 async function createProduct(req, res, next) {
@@ -13,10 +14,16 @@ async function createProduct(req, res, next) {
 async function buyProduct(req, res, next) {
     const { productIDs = [] } = req.body;
     const products = await ProductModel.find({ _id: {$in: productIDs} });
-
-    return res.status(200).json({
-        statusCode: 200,
-        message: 'Product created successfully'
+    const {email} = req.user;
+    await pushToQueue('ORDER', {products, userEmail: email});
+    const channel = await createQueue('PRODUCT');
+    await channel.consume('PRODUCT', msg => {
+        console.log('Order created successfully');
+        channel.ack(msg);
+    })
+    return res.json({
+        statusCode: 201,
+        message: 'Order created successfully'
     })
 }
 

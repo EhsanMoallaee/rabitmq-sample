@@ -1,4 +1,5 @@
 const amqp = require('amqplib');
+const { checkAuth } = require('../functions/checkAuth');
 let channel;
 
 const connectToChannel = async() => {
@@ -18,6 +19,12 @@ const returnChannel = async() => {
     return channel;
 }
 
+const createQueue = async(queueName) => {
+    const channel = await returnChannel();
+    await channel.assertQueue(queueName);
+    return channel;
+}
+
 const pushToQueue = async(queueName, data) => {
     try {
         await channel.assertQueue(queueName);
@@ -27,9 +34,23 @@ const pushToQueue = async(queueName, data) => {
     }
 }
 
+const isAuthenticatedRabitMSG = async(queueName) => {
+    await createQueue(queueName);
+    channel.consume(queueName, async msg => {
+        if(msg.content) {
+            const { token } = JSON.parse(msg.content.toString());
+            if(token) {
+                const result = await checkAuth(token);
+                pushToQueue("ISAUTH", result);
+            }
+        }
+        channel.ack(msg);
+    })
+}
+
 module.exports = {
     connectToChannel,
     returnChannel,
-    pushToQueue
-
+    pushToQueue,
+    isAuthenticatedRabitMSG
 }

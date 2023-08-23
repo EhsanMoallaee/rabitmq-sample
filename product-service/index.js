@@ -11,10 +11,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/product', productRouter);
 
 app.use((req, res, next) => {
-    return res.json({ error: 'NotFound'});
+    return res.json({ error: 'product-NotFound'});
 })
 app.use((err, req, res, next) => {
-    return res.json({ error: err.message});
+    if(err) {
+        console.log('error : ', err);
+        return res.json({ error: err.message});
+    }
 })
 
 app.listen(PORT, () => {

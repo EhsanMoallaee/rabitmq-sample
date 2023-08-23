@@ -1,4 +1,6 @@
 const amqp = require('amqplib');
+const { OrderModel } = require('../model/order.model');
+const { calculateTotalPrice } = require('../functions/calculate.totalPrice');
 let channel;
 
 const connectToChannel = async() => {
@@ -18,6 +20,12 @@ const returnChannel = async() => {
     return channel;
 }
 
+const createQueue = async(queueName) => {
+    const channel = await returnChannel();
+    await channel.assertQueue(queueName);
+    return channel;
+}
+
 const pushToQueue = async(queueName, data) => {
     try {
         await channel.assertQueue(queueName);
@@ -27,9 +35,24 @@ const pushToQueue = async(queueName, data) => {
     }
 }
 
+const createOrderWithQueue = async(queueName) => {
+    await createQueue(queueName);
+    channel.consume(queueName, async msg => {
+        if(msg.content) {
+            const { products, userEmail } = JSON.parse(msg.content.toString());
+            const totalPrice = await calculateTotalPrice(products);
+            const newOrder = await OrderModel.create({ userEmail, products, totalPrice });
+            channel.ack(msg);
+            pushToQueue("PRODUCT", newOrder);
+            console.log('Order created successfully');
+        }
+    })
+}
+
 module.exports = {
     connectToChannel,
     returnChannel,
-    pushToQueue
-
+    pushToQueue,
+    createOrderWithQueue,
+    createQueue
 }
